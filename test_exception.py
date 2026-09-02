@@ -2,20 +2,17 @@ import pytest
 import requests
 from config import BASE_URL
 
-def reset_environment(api_token):
-    """调用重置接口，恢复环境到初始状态"""
+def clear_cart(api_token):
+    """清空购物车"""
     headers = {"Authorization": f"Bearer {api_token}"}
-    url = f"{BASE_URL}/api/admin/reset"
-    try:
-        resp = requests.post(url, json={}, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            print("✅ 环境重置成功")
-        else:
-            print(f"⚠️ 环境重置失败: {resp.status_code}")
-    except requests.exceptions.Timeout:
-        print("⚠️ 重置请求超时，跳过")
-    except Exception as e:
-        print(f"⚠️ 环境重置异常: {e}")
+    resp = requests.get(f"{BASE_URL}/api/cart", headers=headers, timeout=10)
+    if resp.status_code != 200:
+        return
+    items = resp.json().get("items", [])
+    for item in items:
+        delete_url = f"{BASE_URL}/api/cart/{item.get('productId')}"
+        requests.delete(delete_url, headers=headers, timeout=10)
+    print("✅ 购物车已清空")
 
 def test_add_cart_no_auth():
     """未登录加购 → 预期 401"""
@@ -30,7 +27,7 @@ def test_add_cart_no_auth():
 
 def test_create_order_empty_cart(api_token):
     """购物车为空时下单 → 预期 400"""
-    reset_environment(api_token)
+    clear_cart(api_token)  # 直接清空购物车
     headers = {"Authorization": f"Bearer {api_token}"}
     url = f"{BASE_URL}/api/orders"
     resp = requests.post(url, json={}, headers=headers, timeout=10)
