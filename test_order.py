@@ -2,15 +2,22 @@ import requests
 from config import BASE_URL
 
 def test_create_order(api_token):
-    # 前置条件：确保购物车有商品
-    cart_url = f"{BASE_URL}/api/cart"
     headers = {"Authorization": f"Bearer {api_token}"}
+
+    # 清空购物车（先查询再删除）
+    cart_url = f"{BASE_URL}/api/cart"
+    resp = requests.get(cart_url, headers=headers)
+    if resp.status_code == 200:
+        items = resp.json().get("items", [])
+        for item in items:
+            delete_url = f"{BASE_URL}/api/cart/{item.get('productId')}"
+            requests.delete(delete_url, headers=headers)
+
+    # 重新加购
     cart_payload = {"productId": 103, "quantity": 1}
     resp = requests.post(cart_url, json=cart_payload, headers=headers)
-    if resp.status_code == 200:
-        print("✅ 前置加购成功")
-    else:
-        print("⚠️ 加购失败，继续尝试下单")
+    assert resp.status_code == 200, f"加购失败: {resp.text}"
+    print("✅ 前置加购成功")
 
     # 查询当前库存
     url = f"{BASE_URL}/api/products"
@@ -37,6 +44,5 @@ def test_create_order(api_token):
     new_stock = product["stock"]
     print(f"📦 下单后库存: {new_stock}")
 
-    # 断言库存减少了 1
     assert new_stock == initial_stock - 1, f"库存扣减异常: {initial_stock} → {new_stock}"
     print(f"✅ 库存扣减验证通过: {initial_stock} → {new_stock}")
